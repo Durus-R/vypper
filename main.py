@@ -8,24 +8,26 @@ import inquirer
 
 image_installer = {
     "deb": {
-        "Ubuntu 20.04": ["ubuntu:20.04", "apt"],
-        "Ubuntu 22.04 (Recommended)": ["ubuntu:22.04", "apt"],
-        "Debian": ["debian:stable", "apt"]
+        "Ubuntu 20.04": ["docker.io/library/ubuntu:20.04", "apt"],
+        "Ubuntu 22.04 (Recommended)": ["docker.io/library/ubuntu:22.04", "apt"],
+        "Debian": ["docker.io/library/debian:stable", "apt"]
     },
     "rpm": {
         "OpenSUSE LEAP": ["registry.opensuse.org/opensuse/tumbleweed:latest", "zypper"],
-        "Fedora (Recommended)": ["fedora:latest", "dnf"]
+        "Fedora (Recommended)": ["docker.io/library/fedora:latest", "dnf"]
     }
 }
 
 distros = {
-    'Ubuntu 22.04': ["ubuntu:22.04", "apt install {}"], 'Ubuntu 20.04': ["ubuntu:20.04", "apt install {}"],
-    'Fedora': ["fedora:latest", "dnf install {}"], 'Arch Linux': ["archlinux:latest", "pacman -S {}"],
-    'Arch Linux (AUR)': ["archlinux:latest", "sh -c \"pacman -Sy --noconfirm git; git clone "
-                                             "https://aur.archlinux.org/{0}.git {0};"
-                                             "cd {0}}; makepkg -si\""],
+    'Ubuntu 22.04': ["docker.io/library/ubuntu:22.04", "apt install {}"],
+    'Ubuntu 20.04': ["docker.io/library/ubuntu:20.04", "apt install {}"],
+    'Fedora': ["docker.io/library/fedora:latest", "dnf install {}"],
+    'Arch Linux': ["docker.io/library/archlinux:latest", "pacman -S {}"],
+    'Arch Linux (AUR)': ["docker.io/library/archlinux:latest", "sh -c \"pacman -Sy --noconfirm git; git clone "
+                                                               "https://aur.archlinux.org/{0}.git {0};"
+                                                               "cd {0}}; makepkg -si\""],
     'OpenSUSE Leap': ["registry.opensuse.org/opensuse/tumbleweed:latest", "zypper install {}"],
-    'Alpine': ["alpine:latest", "apk add {}"]
+    'Alpine': ["docker.io/library/alpine:latest", "apk add {}"]
 }
 
 
@@ -62,7 +64,7 @@ def install(distro, target: str):
             inquirer.List('distro',
                           message="On which distro do you want to install the package?",
                           choices=['Ubuntu 22.04', 'Ubuntu 20.04', 'Fedora', 'Arch Linux', "Arch Linux (AUR)",
-                                                                                           'OpenSUSE Leap', 'Alpine'],
+                                   'OpenSUSE Leap', 'Alpine'],
                           ),
         ]
         distro = inquirer.prompt(questions)["distro"]
