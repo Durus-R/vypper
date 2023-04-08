@@ -15,15 +15,12 @@ distros = {
     'ubuntu20.04': ["docker.io/library/ubuntu:20.04", "apt install {}"],
     'fedora': ["docker.io/library/fedora:latest", "dnf install {}"],
     "debian": ["docker.io/library/debian:stable", "apt install {}"],
-    'archlinux': ["docker.io/library/archlinux:latest", "pacman -S {}"],
+    'archlinux': ["docker.io/library/archlinux:latest", "pacman -Sy {}"],
     'leap': ["registry.opensuse.org/opensuse/tumbleweed:latest", "zypper install {}"],
     'alpine': ["docker.io/library/alpine:latest", "apk add {}"]
 }
 
 return_code = 0
-
-archlinux_aur_command = "sh -c \"git clone https://aur.archlinux.org/{0}.git {0}; cd {" \
-                        "0}}; makepkg -si\""
 
 
 def create_uuid(distro: str):
@@ -73,14 +70,16 @@ def find_or_create_container(distro: str):
     return machine
 
 
-def setup_machine(image: str, name: str, arch=False):
+def setup_machine(image: str, name: str, install_yay=False):
     print("Pulling and creating the image, this may take some time...")
     with contextlib.redirect_stdout(io.BytesIO()):  # does not work
         os.system("distrobox create -i {} -n {}".format(image, name))
     print("Installing Base Packages, may also take a few minutes...")
     install_step = "echo 0"
-    if arch:
-        install_step = "sudo pacman -Sy --noconfirm git"
+    if install_yay:
+        install_step = "sh -c \"pacman -S --needed --noconfirm git base-devel && git clone " \
+                       "https://aur.archlinux.org/yay-bin.git " \
+                       "&& cd yay-bin && makepkg --noconfirm -si\""
         print("I also need to install git.")
     with contextlib.redirect_stdout(io.BytesIO()):
         os.system("distrobox enter {} -- {}".format(name, install_step))
@@ -155,9 +154,11 @@ def install(distro, target: str):
                 return
             image = distro
         container = find_or_create_container(image)
-        command = "sudo " + distros[distro][1].format(target)
+        command = distros[distro][1].format(target)
         if is_aur:
-            command = archlinux_aur_command.format(target)
+            command = command.replace("pacman", "yay")
+        else:
+            command = "sudo " + command  # Yay does not need sudo
         os.system("distrobox enter {} -- {}".format(container, command))
         click.echo("Installation succeeded. Please run vypper export --help to find out how to access the installed "
                    "binaries or applications")
