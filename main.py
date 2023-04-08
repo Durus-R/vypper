@@ -18,6 +18,7 @@ distros = {
     'fedora': ["docker.io/library/fedora:latest", "dnf install {}"],
     "debian": ["docker.io/library/debian:stable", "apt install {}"],
     'archlinux': ["docker.io/library/archlinux:latest", "pacman -Sy {}"],
+    "kali": ["docker.io/kalilinux/kali-rolling", "apt install {}"],
     'leap': ["registry.opensuse.org/opensuse/tumbleweed:latest", "zypper install {}"],
     'alpine': ["docker.io/library/alpine:latest", "apk add {}"]
 }
@@ -66,7 +67,7 @@ def find_or_create_container(distro: str):
     machine = find_container(distro)
     if machine is None:
         machine = create_uuid(distro)
-        setup_machine(distros[distro][0], machine, arch=(distro == "archlinux"))
+        setup_machine(distros[distro][0], machine, (distro == "archlinux"))
         data["machines"][distro] = machine
     dump_json(data)
     return machine
@@ -93,6 +94,7 @@ shorthands = {
     "Fedora": "fedora",
     "Arch Linux": "archlinux",
     "Arch Linux (AUR)": "archlinux",
+    "Kali Linux": "kali",
     "OpenSUSE Leap": "leap",
     "Alpine": "alpine",
     "Debian": "debian"
@@ -125,6 +127,7 @@ def dist_upgrade(distro):
 @click.argument("target")
 def install(distro, export_app, target: str):
     global return_code
+    data = load_json()
     if os.system("sh -c command -v podman") == 0:
         backend = "podman"
     elif os.system("sh -c command -v docker") == 0:
@@ -150,7 +153,7 @@ def install(distro, export_app, target: str):
                 inquirer.List('distro',
                               message="On which distro do you want to install the package?",
                               choices=['Ubuntu 22.04', 'Ubuntu 20.04', 'Fedora', 'Arch Linux', "Arch Linux (AUR)",
-                                       'OpenSUSE Leap', "Debian", 'Alpine'],
+                                       "Kali Linux", 'OpenSUSE Leap', "Debian", 'Alpine'],
                               ),
             ]
             answer = inquirer.prompt(questions)["distro"]
@@ -166,25 +169,53 @@ def install(distro, export_app, target: str):
                 return
             image = distro
         container = find_or_create_container(image)
-        command = distros[distro][1].format(target)
+        command = distros[image][1].format(target)
         if is_aur:
             command = command.replace("pacman", "yay")
         else:
             command = "sudo " + command  # Yay does not need sudo
         os.system("distrobox enter {} -- {}".format(container, command))
 
-        application_list = subprocess.run([backend, "exec -it", container, "ls /usr/share/applications"],
-                                          capture_output=True)
+        application_list = subprocess.run([backend, "exec", container, "sh -c \"ls /usr/share/applications ; ls "
+                                                                       "/usr/local/share/applications  "
+                                                                       "; ls /var/lib/flatpak/exports/share"
+                                                                       "/applications\""],
+                                          capture_output=True, text=True)
         possible_application = ""
-        for i in application_list.stdout.split(" "):
-            if re.match(target, i.decode("ascii")):
-                possible_application = i.decode("ascii")
+        for i in application_list.stdout.split("\n"):
+            if re.match(target, i, flags=re.IGNORECASE):
+                possible_application = i
                 break
+        if not possible_application:
+            application_list = subprocess.run([backend, "exec", container, "ls", "/usr/bin"], capture_output=True,
+                                              text=True)
+            # print(application_list.stdout)
+            for i in application_list.stdout.split("\n"):
+                if re.match(target, i, flags=re.IGNORECASE):
+                    possible_application = os.path.join("/usr/bin/", i)
+                    break
         if possible_application and (
-                export_app or inquirer.confirm("Export /usr/share/applications/{}?".format(possible_application))):
-            os.system("distrobox enter {} -- {}".format(container, "distrobox-export --app {}".format(target)))
-        click.echo("Installation succeeded. Please run vypper export --help to find out how to access the installed "
-                   "binaries or applications")
+                export_app or inquirer.confirm("Export {}?".format(possible_application))):
+            sudo = ""
+            if inquirer.confirm("Run always with sudo?"):
+                sudo = "--sudo"
+            if possible_application.startswith("/usr/bin"):
+                os.system("distrobox enter {} -- {}".format(container, "distrobox-export --bin /usr/bin/{} {} "
+                                                                       "--export-path ~/.local/bin".format(possible_application,
+                                                                                                           sudo)))
+                exported_binary="/usr/bin/"+possible_application
+            else:
+                os.system("distrobox enter {} -- {}".format(container, "distrobox-export --app {} {}".format(target,
+                                                                                                             sudo)))
+                exported_app=possible_application
+        else:
+            click.echo("Installation succeeded. Please run vypper export --help to find out how to access the installed"
+                       " binaries or applications")
+        data["packages"][target] = {
+            "installed_in" : container,
+            "exported_apps": exported_apps,
+            "exported_binaries": exported_binaries,
+        }
     elif extension.lower() == "deb":
         pass
     elif extension.lower() == "rpm":
