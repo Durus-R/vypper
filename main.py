@@ -129,7 +129,7 @@ def dist_upgrade(distro):
 @click.argument("target")
 def install(distro, export_app, target: str):
     global return_code
-    data = load_json()
+    load_json()
     if os.system("sh -c command -v podman") == 0:
         backend = "podman"
     elif os.system("sh -c command -v docker") == 0:
@@ -203,13 +203,14 @@ def install(distro, export_app, target: str):
                 sudo = "--sudo"
             if possible_application.startswith("/usr/bin"):
                 os.system("distrobox enter {} -- {}".format(container, "distrobox-export --bin /usr/bin/{} {} "
-                                                                       "--export-path ~/.local/bin".format(possible_application,
-                                                                                                           sudo)))
-                exported_binary="/usr/bin/"+possible_application
+                                                                       "--export-path ~/.local/bin".format(
+                    possible_application,
+                    sudo)))
+                exported_binary = "/usr/bin/" + possible_application
             else:
                 os.system("distrobox enter {} -- {}".format(container, "distrobox-export --app {} {}".format(target,
                                                                                                              sudo)))
-                exported_app=possible_application
+                exported_app = possible_application
         else:
             click.echo("Installation succeeded. Please run vypper export --help to find out how to access the installed"
                        " binaries or applications")
