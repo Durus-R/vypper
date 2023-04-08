@@ -10,6 +10,8 @@ import uuid
 import click
 import inquirer
 
+from sqlalchemy import create_engine
+
 json_file_path = "data.json"
 
 distros = {
@@ -211,11 +213,7 @@ def install(distro, export_app, target: str):
         else:
             click.echo("Installation succeeded. Please run vypper export --help to find out how to access the installed"
                        " binaries or applications")
-        data["packages"][target] = {
-            "installed_in" : container,
-            "exported_apps": exported_apps,
-            "exported_binaries": exported_binaries,
-        }
+
     elif extension.lower() == "deb":
         pass
     elif extension.lower() == "rpm":
@@ -238,7 +236,7 @@ cli.add_command(install)
 cli.add_command(dist_upgrade)
 
 if __name__ == "__main__":
-    init_json()
+    engine = create_engine("sqlite://db.sqlite", echo=True)
     if len(sys.argv) == 1:
         click.echo("ERROR: No Command given")
         sys.exit(1)
