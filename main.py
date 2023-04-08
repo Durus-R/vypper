@@ -102,16 +102,26 @@ def is_aur_command(a):
 
 
 @click.command(name="dist-upgrade")
-def dist_upgrade():
+@click.argument("distro")
+def dist_upgrade(distro):
+    global return_code
     data = load_json()
+    if distro:
+        try:
+            os.system("distrobox upgrade {}".format(data["machines"][distro]))
+        except KeyError:
+            click.echo("Distribution not installed via vypper.", err=True)
+            return_code = 1
+        return
     for i in data["machines"]:
         os.system("distrobox upgrade {}".format(data["machines"][i]))
 
 
 @click.command()
 @click.option("--distro", default="")
+@click.option("--export-app", default=False)
 @click.argument("target")
-def install(distro, target: str):
+def install(distro, export_app, target: str):
     global return_code
     if os.system("sh -c command -v podman") == 0:
         backend = "podman"
@@ -160,6 +170,8 @@ def install(distro, target: str):
         else:
             command = "sudo " + command  # Yay does not need sudo
         os.system("distrobox enter {} -- {}".format(container, command))
+        if export_app:
+            os.system("distrobox enter {} -- {}".format(container, "distrobox-export --app {}".format(target)))
         click.echo("Installation succeeded. Please run vypper export --help to find out how to access the installed "
                    "binaries or applications")
     elif extension.lower() == "deb":
