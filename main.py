@@ -2,6 +2,8 @@ import contextlib
 import io
 import json
 import os
+import re
+import subprocess
 import sys
 import uuid
 
@@ -170,7 +172,16 @@ def install(distro, export_app, target: str):
         else:
             command = "sudo " + command  # Yay does not need sudo
         os.system("distrobox enter {} -- {}".format(container, command))
-        if export_app:
+
+        application_list = subprocess.run([backend, "exec -it", container, "ls /usr/share/applications"],
+                                          capture_output=True)
+        possible_application = ""
+        for i in application_list.stdout.split(" "):
+            if re.match(target, i.decode("ascii")):
+                possible_application = i.decode("ascii")
+                break
+        if possible_application and (
+                export_app or inquirer.confirm("Export /usr/share/applications/{}?".format(possible_application))):
             os.system("distrobox enter {} -- {}".format(container, "distrobox-export --app {}".format(target)))
         click.echo("Installation succeeded. Please run vypper export --help to find out how to access the installed "
                    "binaries or applications")
